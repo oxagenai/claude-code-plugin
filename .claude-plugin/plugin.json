@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "oxagen",
+  "version": "0.21.6",
+  "description": "Ontology layer for AI agents. Typed, queryable knowledge graph exposed to Claude Code as MCP-native tools — every code edit, research question, incident triage, or memory lookup gets grounded in deterministic graph context instead of guessing.",
+  "author": {
+    "name": "Oxagen",
+    "email": "support@oxagen.ai",
+    "url": "https://oxagen.ai"
+  },
+  "homepage": "https://oxagen.ai",
+  "repository": "https://github.com/oxagenai/claude-code-plugin",
+  "documentation": "https://docs.oxagen.ai/plugins/claude-code-plugin",
+  "issues": "https://github.com/oxagenai/claude-code-plugin/issues",
+  "license": "MIT",
+  "category": "development",
+  "keywords": [
+    "ontology",
+    "knowledge-graph",
+    "mcp",
+    "memory",
+    "code-intelligence",
+    "incident-response",
+    "rag",
+    "agent-coordination",
+    "neo4j",
+    "self-improving"
+  ]
+}

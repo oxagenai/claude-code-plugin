@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "oxagen": {
+      "type": "http",
+      "url": "https://mcp.oxagen.ai/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${OXAGEN_MCP_TOKEN}"
+      }
+    }
+  }
+}

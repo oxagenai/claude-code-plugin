@@ -1,0 +1,4 @@
+# Plugin install artifacts the user generates locally
+*.local.json
+*.local.md
+node_modules/

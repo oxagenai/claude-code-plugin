@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# SessionStart hook for the Oxagen Claude Code plugin.
+#
+# Force-loads the using-oxagen gate skill into the session as
+# additionalContext, wrapped in <EXTREMELY_IMPORTANT> tags so the agent
+# applies the routing policy on every turn before tool selection.
+#
+# Adds an always-on preamble that pins three guarantees:
+#   1. The Oxagen workspace is the source of truth — graph + memory.
+#   2. Memory recall is considered before any non-trivial action.
+#   3. Captured episodes/findings are written back after meaningful work.
+#
+# Pattern derived from the superpowers plugin (MIT, Jesse Vincent).
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+gate_content=$(cat "${PLUGIN_ROOT}/skills/using-oxagen/SKILL.md" 2>&1 \
+    || echo "Error reading using-oxagen skill")
+
+# Escape a string for embedding inside a JSON string value.
+# Bash parameter substitution is orders of magnitude faster than a
+# character-by-character loop and avoids spawning jq for one field.
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+preamble=$(cat <<'PREAMBLE'
+The Oxagen plugin is installed and enabled for this session. The workspace
+this session is acting on is exposed as a typed, queryable knowledge graph
+over MCP, with durable agent memory layered on top.
+
+Treat Oxagen as a first-class concern on every turn — not only for code:
+
+1. **Graph first, guess second.** Before any non-trivial action — code edit,
+   research synthesis, incident triage, ops change, customer-impact analysis,
+   policy lookup — query the Oxagen graph (`ontology.*`, `code.*`,
+   `incident.*`, `security.*`, `workspace.*`). The graph is deterministic;
+   name-matches and prior context are not.
+
+2. **Memory always recalled.** At the start of any task, call
+   `memory.recall` (or the routing skill's equivalent) on the intent. If a
+   procedure or episode matches, prefer it over rediscovery — that is the
+   value of memory. After meaningful work, persist what you learned with
+   `memory.remember` and `agent.record_finding` so the next session inherits
+   it.
+
+3. **Coordinate.** Other agents may be operating against the same workspace.
+   Use `agent.list_active_claims` before editing shared scope and
+   `agent.claim_work` while you hold it.
+
+The full routing policy lives in the `oxagen:using-oxagen` skill below. The
+exhaustive tool catalog lives in the `oxagen:oxagen-tool-reference` skill —
+load it on demand. Write-back conventions live in the `oxagen:dogfooding`
+skill — load it after meaningful changes.
+PREAMBLE
+)
+
+preamble_escaped=$(escape_for_json "$preamble")
+gate_escaped=$(escape_for_json "$gate_content")
+session_context="<EXTREMELY_IMPORTANT>\n${preamble_escaped}\n\n--- BEGIN oxagen:using-oxagen SKILL ---\n\n${gate_escaped}\n\n--- END oxagen:using-oxagen SKILL ---\n</EXTREMELY_IMPORTANT>"
+
+# Output context injection as JSON. Match the platform's expected shape.
+# - Cursor sets CURSOR_PLUGIN_ROOT and reads top-level additional_context.
+# - Claude Code sets CLAUDE_PLUGIN_ROOT and reads
+#   hookSpecificOutput.additionalContext.
+# - Copilot CLI sets COPILOT_CLI=1 and reads top-level additionalContext
+#   (SDK standard).
+#
+# printf is used instead of a heredoc to avoid bash 5.3+ heredoc hangs.
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+    printf '{\n  "additional_context": "%s"\n}\n' "$session_context"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+    printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context"
+else
+    printf '{\n  "additionalContext": "%s"\n}\n' "$session_context"
+fi
+
+exit 0
